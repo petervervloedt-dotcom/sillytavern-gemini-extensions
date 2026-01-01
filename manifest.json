@@ -2,8 +2,8 @@
 {
     "name": "gemini-agent-ext",
     "display_name": "Gemini Multi-Modal Agent",
-    "description": "A powerful Gemini-driven assistant for vision analysis, lore generation, and plot brainstorming.",
-    "version": "1.1.0",
+    "description": "Powerful Gemini-driven vision and lore tools for SillyTavern.",
+    "version": "1.1.1",
     "author": "Gemini Developer",
     "entry_point": "index.js",
     "js": ["index.js"],

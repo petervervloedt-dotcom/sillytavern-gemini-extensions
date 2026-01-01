@@ -2,8 +2,22 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Message, LoreEntry } from "../types";
 
-// Always use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+const getModel = (task: 'vision' | 'lore' | 'brainstorm' | 'chat') => {
+  const keyMap = {
+    vision: 'visionModel',
+    lore: 'loreModel',
+    brainstorm: 'brainstormModel',
+    chat: 'chatModel'
+  };
+  const defaultModels = {
+    vision: 'gemini-3-flash-preview',
+    lore: 'gemini-3-flash-preview',
+    brainstorm: 'gemini-3-pro-preview',
+    chat: 'gemini-3-flash-preview'
+  };
+  return localStorage.getItem(keyMap[task]) || defaultModels[task];
+};
+
 export const getGeminiClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 };
@@ -14,7 +28,7 @@ export const getGeminiClient = () => {
 export async function generateLoreEntry(prompt: string): Promise<LoreEntry> {
   const ai = getGeminiClient();
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: getModel('lore'),
     contents: `Generate a SillyTavern compatible Lorebook entry for: ${prompt}. 
     Return a JSON object with keys: "name" (string), "keys" (array of trigger keywords), and "content" (the actual lore description).`,
     config: {
@@ -52,7 +66,7 @@ export async function analyzeRoleplayImage(
     : "Analyze this setting image. Provide a vivid, sensory-rich scene description for a roleplaying game context.";
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: getModel('vision'),
     contents: {
       parts: [
         { inlineData: { data: base64Image, mimeType } },
@@ -65,7 +79,6 @@ export async function analyzeRoleplayImage(
 
 /**
  * Generic image analysis for the Extension Drawer.
- * Fixes: Module '"../services/geminiService"' has no exported member 'analyzeImage'.
  */
 export async function analyzeImage(
   base64Image: string, 
@@ -74,7 +87,7 @@ export async function analyzeImage(
 ): Promise<string> {
   const ai = getGeminiClient();
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: getModel('vision'),
     contents: {
       parts: [
         { inlineData: { data: base64Image, mimeType } },
@@ -91,7 +104,7 @@ export async function analyzeImage(
 export async function suggestPlotHooks(history: string): Promise<string[]> {
   const ai = getGeminiClient();
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: getModel('brainstorm'),
     contents: `Based on this roleplay history, suggest 3 distinct and exciting plot hooks or next actions: \n\n${history}`,
     config: {
       responseMimeType: "application/json",
@@ -110,12 +123,10 @@ export async function suggestPlotHooks(history: string): Promise<string[]> {
 
 /**
  * Sends a message in a chat context.
- * Fixes: Module '"../services/geminiService"' has no exported member 'sendChatMessage'.
  */
 export async function sendChatMessage(messages: Message[], systemInstruction: string): Promise<string> {
   const ai = getGeminiClient();
   
-  // Convert internal Message array to Gemini contents format
   const contents = messages
     .filter(m => m.role !== 'system')
     .map(m => ({
@@ -124,7 +135,7 @@ export async function sendChatMessage(messages: Message[], systemInstruction: st
     }));
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: getModel('chat'),
     contents,
     config: {
       systemInstruction,

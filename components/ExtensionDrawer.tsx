@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Mic, X, ChevronRight, Settings, Terminal } from 'lucide-react';
+import { Send, Image as ImageIcon, Mic, MicOff, X, Settings, Terminal } from 'lucide-react';
 import { Message } from '../types';
 import { sendChatMessage, analyzeImage } from '../services/geminiService';
 import ChatBubble from './ChatBubble';
@@ -15,21 +15,56 @@ const ExtensionDrawer: React.FC<ExtensionDrawerProps> = ({ isOpen, onClose }) =>
     {
       id: '1',
       role: 'model',
-      content: "Hello! I am your Gemini Agent extension. I run on a separate API configuration from SillyTavern's main backend. How can I assist you today?",
+      content: "Hello! I am your Gemini Agent extension. How can I assist your roleplay today?",
       timestamp: Date.now(),
       type: 'text'
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const toggleVoice = () => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition not supported in this browser.");
+      return;
+    }
+
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = 'en-US';
+
+    recognitionRef.current.onstart = () => setIsRecording(true);
+    recognitionRef.current.onend = () => setIsRecording(false);
+    
+    recognitionRef.current.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(prev => prev + (prev ? ' ' : '') + transcript);
+    };
+
+    recognitionRef.current.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error);
+      setIsRecording(false);
+    };
+
+    recognitionRef.current.start();
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -109,7 +144,6 @@ const ExtensionDrawer: React.FC<ExtensionDrawerProps> = ({ isOpen, onClose }) =>
 
   return (
     <div className="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-[#1a1a1a] shadow-2xl flex flex-col z-50 border-l border-neutral-800 transition-all duration-300">
-      {/* Header */}
       <div className="p-4 bg-neutral-900 flex items-center justify-between border-b border-neutral-800">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
@@ -117,27 +151,17 @@ const ExtensionDrawer: React.FC<ExtensionDrawerProps> = ({ isOpen, onClose }) =>
           </div>
           <div>
             <h2 className="font-bold text-neutral-200">Gemini Agent</h2>
-            <p className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold">Extension v1.0.0</p>
+            <p className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold">Extension v1.1.0</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="p-2 text-neutral-400 hover:bg-neutral-800 rounded-lg transition-colors">
-            <Settings size={20} />
-          </button>
-          <button 
-            onClick={onClose}
-            className="p-2 text-neutral-400 hover:bg-neutral-800 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 text-neutral-400 hover:bg-neutral-800 rounded-lg transition-colors">
             <X size={20} />
           </button>
         </div>
       </div>
 
-      {/* Messages */}
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#121212]"
-      >
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#121212]">
         {messages.map((msg) => (
           <ChatBubble key={msg.id} message={msg} />
         ))}
@@ -154,14 +178,13 @@ const ExtensionDrawer: React.FC<ExtensionDrawerProps> = ({ isOpen, onClose }) =>
         )}
       </div>
 
-      {/* Input Area */}
       <div className="p-4 bg-neutral-900 border-t border-neutral-800">
         <div className="relative group">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Talk to Gemini Agent..."
-            className="w-full bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl py-3 pl-4 pr-32 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent resize-none min-h-[50px] max-h-[150px]"
+            placeholder={isRecording ? "Listening..." : "Talk to Gemini Agent..."}
+            className={`w-full bg-neutral-800 border ${isRecording ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-neutral-700'} text-neutral-200 rounded-xl py-3 pl-4 pr-32 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent resize-none min-h-[50px] max-h-[150px]`}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -177,8 +200,14 @@ const ExtensionDrawer: React.FC<ExtensionDrawerProps> = ({ isOpen, onClose }) =>
             >
               <ImageIcon size={18} />
             </button>
-            <button className="p-2 text-neutral-400 hover:text-indigo-400 hover:bg-neutral-700 rounded-lg transition-all" title="Voice Input">
-              <Mic size={18} />
+            <button 
+              onClick={toggleVoice}
+              className={`p-2 transition-all rounded-lg ${
+                isRecording ? 'text-indigo-400 bg-indigo-600/20' : 'text-neutral-400 hover:text-indigo-400 hover:bg-neutral-700'
+              }`}
+              title={isRecording ? "Stop Recording" : "Voice Input"}
+            >
+              {isRecording ? <MicOff size={18} className="animate-pulse" /> : <Mic size={18} />}
             </button>
             <button 
               onClick={handleSend}
@@ -191,9 +220,6 @@ const ExtensionDrawer: React.FC<ExtensionDrawerProps> = ({ isOpen, onClose }) =>
             </button>
           </div>
         </div>
-        <p className="text-[10px] text-neutral-600 mt-2 text-center uppercase font-medium">
-          Powered by Gemini 3 Pro • Experimental extension
-        </p>
       </div>
 
       <input 

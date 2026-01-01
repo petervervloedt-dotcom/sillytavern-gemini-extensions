@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Sparkles, 
   Image as ImageIcon, 
@@ -11,9 +11,10 @@ import {
   Upload,
   RefreshCw,
   Terminal,
-  X
+  Cpu,
+  Info
 } from 'lucide-react';
-import { ExtensionTab, LoreEntry } from './types';
+import { ExtensionTab, LoreEntry, AppSettings } from './types';
 import { analyzeRoleplayImage, generateLoreEntry, suggestPlotHooks } from './services/geminiService';
 
 const App: React.FC = () => {
@@ -34,6 +35,19 @@ const App: React.FC = () => {
   // Brainstorm State
   const [historyInput, setHistoryInput] = useState('');
   const [hooks, setHooks] = useState<string[]>([]);
+
+  // Settings State
+  const [settings, setSettings] = useState<AppSettings>({
+    visionModel: localStorage.getItem('visionModel') || 'gemini-3-flash-preview',
+    loreModel: localStorage.getItem('loreModel') || 'gemini-3-flash-preview',
+    brainstormModel: localStorage.getItem('brainstormModel') || 'gemini-3-pro-preview',
+    chatModel: localStorage.getItem('chatModel') || 'gemini-3-flash-preview',
+  });
+
+  const updateSetting = (key: keyof AppSettings, value: string) => {
+    localStorage.setItem(key, value);
+    setSettings(prev => ({ ...prev, [key]: value }));
+  };
 
   const triggerCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -88,9 +102,23 @@ const App: React.FC = () => {
     }
   };
 
+  const ModelSelect = ({ label, value, onChange }: { label: string, value: string, onChange: (val: string) => void }) => (
+    <div className="flex flex-col gap-2">
+      <label className="text-[10px] uppercase font-bold text-neutral-500 tracking-widest">{label}</label>
+      <select 
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-600 outline-none"
+      >
+        <option value="gemini-3-flash-preview">Gemini 3 Flash (Fast)</option>
+        <option value="gemini-3-pro-preview">Gemini 3 Pro (High Quality)</option>
+        <option value="gemini-2.5-flash-lite-latest">Gemini 2.5 Flash Lite</option>
+      </select>
+    </div>
+  );
+
   return (
     <div className="flex h-screen w-full bg-[#0d0d0d] text-neutral-300 font-sans overflow-hidden">
-      {/* Extension Mini-Tabs */}
       <nav className="w-14 bg-[#141414] border-r border-neutral-800 flex flex-col items-center py-4 gap-4">
         <TabButton icon={<ImageIcon size={18} />} active={activeTab === 'vision'} onClick={() => setActiveTab('vision')} label="Vision" />
         <TabButton icon={<BookOpen size={18} />} active={activeTab === 'lore'} onClick={() => setActiveTab('lore')} label="Lore" />
@@ -100,7 +128,6 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden bg-[#0d0d0d]">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {activeTab === 'vision' && (
@@ -222,18 +249,61 @@ const App: React.FC = () => {
                 </div>
             </div>
           )}
+
+          {activeTab === 'settings' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Cpu size={14} className="text-indigo-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-200">Model Configuration</h3>
+                </div>
+                
+                <ModelSelect 
+                  label="Vision & Analysis Model" 
+                  value={settings.visionModel} 
+                  onChange={(val) => updateSetting('visionModel', val)} 
+                />
+                
+                <ModelSelect 
+                  label="Lore Generation Model" 
+                  value={settings.loreModel} 
+                  onChange={(val) => updateSetting('loreModel', val)} 
+                />
+
+                <ModelSelect 
+                  label="Brainstorming Model" 
+                  value={settings.brainstormModel} 
+                  onChange={(val) => updateSetting('brainstormModel', val)} 
+                />
+
+                <ModelSelect 
+                  label="Chat Assistant Model" 
+                  value={settings.chatModel} 
+                  onChange={(val) => updateSetting('chatModel', val)} 
+                />
+              </section>
+
+              <section className="p-4 bg-indigo-600/10 border border-indigo-500/20 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-indigo-400">
+                  <Info size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">About API Keys</span>
+                </div>
+                <p className="text-[10px] text-neutral-500 leading-relaxed">
+                  The API key is managed externally via your environment or SillyTavern plugin settings. This extension uses the system-provided key for all Gemini requests.
+                </p>
+              </section>
+            </div>
+          )}
         </div>
 
-        {/* Mini status bar */}
         <footer className="h-6 bg-[#1a1a1a] border-t border-neutral-800 px-3 flex items-center justify-between text-[9px] text-neutral-600 font-mono">
           <div>EXT_CONNECTED</div>
           <div className="flex gap-2">
-            <span>GEMINI_3_FLASH</span>
+            <span>{settings.chatModel.toUpperCase()}</span>
           </div>
         </footer>
       </main>
 
-      {/* Loading Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[100] flex items-center justify-center pointer-events-none">
           <div className="bg-[#1a1a1a] border border-neutral-800 p-3 rounded-lg flex items-center gap-2 shadow-2xl">

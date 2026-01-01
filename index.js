@@ -1,115 +1,143 @@
 
 /**
- * SillyTavern Extension Loader
- * This script runs in the SillyTavern browser context.
+ * SillyTavern Extension Loader: Gemini Multi-Modal Agent
+ * This script runs in the main SillyTavern window context.
  */
 
 (function() {
-    const extensionName = "gemini-agent-ext";
-    const extensionFolderPath = `extensions/${extensionName}/`;
+    // Dynamically detect the extension path to avoid hardcoding folder names
+    const scriptSrc = document.currentScript ? document.currentScript.src : '';
+    const extensionPath = scriptSrc.substring(0, scriptSrc.lastIndexOf('/') + 1);
+    
+    console.log("Gemini Agent Extension: Loading from", extensionPath);
 
     function initExtension() {
-        console.log("Gemini Agent Extension: Initializing...");
-
-        // 1. Create a button in the SillyTavern Extension menu
+        // Create the menu item in SillyTavern's extensions list
         const extensionMenuButton = document.createElement('div');
         extensionMenuButton.classList.add('list-group-item', 'list-group-item-action', 'clickable');
         extensionMenuButton.innerHTML = `
-            <i class="fas fa-robot"></i>
+            <i class="fas fa-magic"></i>
             <span class="extension_name">Gemini Agent</span>
         `;
 
         extensionMenuButton.addEventListener('click', () => {
-            showGeminiWindow();
+            toggleGeminiWindow();
         });
 
-        // Add to SillyTavern's extensions list
+        // Add to SillyTavern's extensions panel
         const extensionsList = document.getElementById('extensions_settings_list');
         if (extensionsList) {
             extensionsList.appendChild(extensionMenuButton);
+        } else {
+            // Fallback if the settings panel isn't open yet
+            const observer = new MutationObserver((mutations, obs) => {
+                const list = document.getElementById('extensions_settings_list');
+                if (list) {
+                    list.appendChild(extensionMenuButton);
+                    obs.disconnect();
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
         }
     }
 
-    function showGeminiWindow() {
-        // Check if window already exists
-        if (document.getElementById('gemini-agent-container')) {
-            const existing = document.getElementById('gemini-agent-container');
-            existing.style.display = existing.style.display === 'none' ? 'flex' : 'none';
+    function toggleGeminiWindow() {
+        const containerId = 'gemini-agent-container';
+        let container = document.getElementById(containerId);
+
+        if (container) {
+            container.style.display = container.style.display === 'none' ? 'flex' : 'none';
             return;
         }
 
-        // Create a floating container for the React App
-        const container = document.createElement('div');
-        container.id = 'gemini-agent-container';
+        // Create a floating, draggable window
+        container = document.createElement('div');
+        container.id = containerId;
         container.style.cssText = `
             position: fixed;
-            top: 60px;
+            top: 70px;
             right: 20px;
-            width: 450px;
-            height: 80vh;
+            width: 420px;
+            height: 75vh;
             background: #0d0d0d;
-            border: 1px solid #333;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            z-index: 2001;
+            border: 1px solid #222;
+            border-radius: 10px;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.9);
+            z-index: 3000;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             resize: both;
+            min-width: 300px;
+            min-height: 400px;
         `;
 
-        // Create Header/Draggable area
+        // Draggable Header
         const header = document.createElement('div');
         header.style.cssText = `
-            padding: 10px;
-            background: #1a1a1a;
+            padding: 12px;
+            background: #161616;
             cursor: move;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid #222;
+            user-select: none;
         `;
         header.innerHTML = `
-            <span style="font-weight: bold; font-size: 12px; color: #888; text-transform: uppercase;">Gemini Agent Utility</span>
-            <button id="gemini-close-btn" style="background:none; border:none; color:#666; cursor:pointer;">✕</button>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <i class="fas fa-sparkles" style="color:#6366f1; font-size: 12px;"></i>
+                <span style="font-weight: bold; font-size: 11px; color: #ddd; text-transform: uppercase; letter-spacing: 1px;">Gemini Agent Utility</span>
+            </div>
+            <div id="gemini-close-btn" style="cursor:pointer; color:#555; font-size: 16px; padding: 0 5px;">&times;</div>
         `;
 
-        // Iframe to load our React app (index.html)
+        // Content Iframe
         const iframe = document.createElement('iframe');
-        iframe.src = `${window.location.origin}/extensions/${extensionName}/index.html`;
+        iframe.src = `${extensionPath}index.html`;
         iframe.style.cssText = `
             flex: 1;
             border: none;
             width: 100%;
             height: 100%;
+            background: transparent;
         `;
 
         container.appendChild(header);
         container.appendChild(iframe);
         document.body.appendChild(container);
 
-        // Simple Close Logic
+        // Close logic
         document.getElementById('gemini-close-btn').onclick = () => {
             container.style.display = 'none';
         };
 
-        // Simple Drag Logic
-        let isDragging = false;
-        let offset = [0,0];
+        // Improved Dragging
+        let active = false;
+        let currentX, currentY, initialX, initialY;
+        let xOffset = 0, yOffset = 0;
+
         header.onmousedown = (e) => {
-            isDragging = true;
-            offset = [container.offsetLeft - e.clientX, container.offsetTop - e.clientY];
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+            if (e.target === header || header.contains(e.target)) active = true;
         };
+
         document.onmousemove = (e) => {
-            if (!isDragging) return;
-            container.style.left = (e.clientX + offset[0]) + 'px';
-            container.style.top = (e.clientY + offset[1]) + 'px';
-            container.style.right = 'auto'; // Remove right constraint once moved
+            if (active) {
+                e.preventDefault();
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+                xOffset = currentX;
+                yOffset = currentY;
+                container.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+            }
         };
-        document.onmouseup = () => { isDragging = false; };
+
+        document.onmouseup = () => { active = false; };
     }
 
-    // Load extension when SillyTavern is ready
+    // Initialize
     if (document.readyState === 'complete') {
         initExtension();
     } else {

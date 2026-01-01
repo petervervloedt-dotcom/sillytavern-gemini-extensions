@@ -17,3 +17,10 @@ export interface LoreEntry {
 }
 
 export type ExtensionTab = 'vision' | 'lore' | 'brainstorm' | 'settings';
+
+export interface AppSettings {
+  visionModel: string;
+  loreModel: string;
+  brainstormModel: string;
+  chatModel: string;
+}

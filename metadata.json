@@ -1,0 +1,8 @@
+{
+  "name": "Gemini Agent for SillyTavern",
+  "description": "A high-performance Gemini-powered extension for roleplaying interfaces, featuring multi-modal input (text, voice, image) and dedicated AI agent logic.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
